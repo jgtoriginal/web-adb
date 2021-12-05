@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+        <title>WebADB</title>
+    </head>
+    <body>
+        <div id="root" dir="auto"></div>
+
+        <script type="text/babel">
+            // const App = () => {
+            //     let device = null
+            //     fetch('http://localhost:8888/devices')
+            //         .then(response => response.json())
+            //         .then(data => {
+            //             console.log(data)
+            //             device = data
+            //         })
+            //         .catch(e => console.log(e))
+
+            //     if (!device) {
+            //         return <div>...</div>
+            //     } else {
+            //         return (
+            //             <div>
+            //                 Hello Universe!
+            //             </div>
+            //         );
+            //     }
+            // }
+
+            // ReactDOM.render(
+            //     <App />,
+            //     document.getElementById('root')
+            // );
+
+            class App extends React.Component {
+                constructor(props) {
+                    super(props);
+                    this.state = {
+                        baseUrl: 'http://localhost:8888',
+                        device: [],
+                        connection: 'No device connected'
+                    };
+                }
+                componentWillMount() {
+                    const { baseUrl } = this.state;
+                    fetch(`${baseUrl}/devices`)
+                        .then(response => response.json())
+                        .then(device => {
+                            this.setState({
+                                device,
+                                connection: `${device[0].manufacturer.toUpperCase()} ${device[0].model}`
+                            })
+
+                            fetch(`${baseUrl}/shell`, {
+                                method: 'POST',
+                                body: JSON.stringify({ 'device': device[0].id, 'command': 'pm list packages -f | sed -e "s/.*=//" | sort'}),
+                            })
+                            .then(res => res.text())
+                            .then(packages => {
+                                if (!this.state.packages) this.setState({ packages: packages.split('\n') })
+                            })
+                            .catch(e => console.log(e))
+                        })
+                        .catch(e => console.log(e))
+                }
+                deleteApp(item) {
+                    let { baseUrl, device, packages } = this.state;
+                    fetch(`${baseUrl}/shell`, {
+                        method: 'POST',
+                        body: JSON.stringify({ 'device': device[0].id, 'command': `pm uninstall --user 0 ${item}` }),
+                    })
+                        .then(res => res.text())
+                        .then(data => {
+                            console.log(`App deletion message for ${item}: ${data}`)
+                            this.setState({ packages: packages.filter(pkg => pkg !== item)})
+                        })
+                        .catch(e => console.log(e))
+                }
+                render() {
+                    let { device, connection, packages, iframe } = this.state
+
+                    return (
+                        <div>
+                            <table>
+                                <tr colspan="3">
+                                    <th>Android App Administration Dashboarad</th>
+                                </tr>
+                                <tr colspan="2">
+                                    <td>Device</td>
+                                    <td>{connection}</td>
+                                </tr>
+                                {packages && packages.map(item => {
+                                    if (item.length > 0) {
+                                        return (
+                                            <tr>
+                                                <td>
+                                                    <a href={`https://play.google.com/store/apps/details?id=${item}`} target="_blank">{item}</a>
+                                                </td>
+                                                <td>
+                                                    <button onClick={() => this.deleteApp(item)}>delete</button>
+                                                </td>
+                                            </tr>
+                                        )
+                                    }
+                                })}
+                            </table>
+                        </div>
+                    );
+                }
+            }
+
+
+            ReactDOM.render(
+                <App />,
+                document.getElementById('root')
+            );
+
+
+        </script>
+
+        <script src="https://unpkg.com/react@16.13.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+        <script src="https://unpkg.com/react-dom@16.13.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+
+        <script src="https://cdn.jsdelivr.net/npm/dataformsjs@4.0.1/js/react/jsxLoader.min.js"></script>  
+    </body>
+</html>
+
